@@ -21,6 +21,6 @@ chmod +x ./install.sh && ./install.sh
 
 ## Back
 ``` bash
-wget -O install.sh https://raw.githubusercontent.com/klts-io/setup-cri-dockerd/main/uninstall.sh
+wget -O uninstall.sh https://raw.githubusercontent.com/klts-io/setup-cri-dockerd/main/uninstall.sh
 chmod +x ./uninstall.sh && ./uninstall.sh
 ```
