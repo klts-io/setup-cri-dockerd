@@ -152,8 +152,10 @@ function configure_kubelet() {
             echo "You no enter 'y', so abort install now"
             echo "but the cri-dockerd is installed and running"
             echo "if need is uninstall the cri-dockerd please run:"
-            echo "   systemctl stop cri-docker.service"
-            echo "   systemctl disable cri-docker.service"
+            echo "   systemctl stop ${SERVICE_NAME}"
+            echo "   systemctl disable ${SERVICE_NAME}"
+            echo "   rm ${SERVICE_PATH}"
+            echo "   rm ${BIN_PATH}/${BIN_NAME}"
             exit 1
             ;;
         esac
