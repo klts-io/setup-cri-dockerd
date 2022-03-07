@@ -34,4 +34,5 @@ systemctl restart kubelet
 systemctl disable cri-docker.service
 systemctl stop cri-docker.service
 
-rm -rf "${SERVICE_PATH}"
+rm -f "${SERVICE_PATH}"
+
