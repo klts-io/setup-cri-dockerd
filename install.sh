@@ -119,7 +119,7 @@ EOF
 }
 
 function configure_kubelet() {
-    NEW_FLAGE=$(echo "${OLD_FLAGS%\"*} --container-runtime=remote --container-runtime-endpoint=${CRI_SOCK}\"")
+    NEW_FLAGS=$(echo "${OLD_FLAGS%\"*} --container-runtime=remote --container-runtime-endpoint=${CRI_SOCK}\"")
 
     case "${FORCE}" in
     [yY][eE][sS] | [yY])
@@ -127,12 +127,13 @@ function configure_kubelet() {
         ;;
     *)
 
-        echo "============= Diff kubeadm-flags.env with new =============="
-        diff "${KUBEADM_FLAGS_ENV}" <(echo "${NEW_FLAGE}") || :
+        echo "============== The original kubeadm-flags.env =============="
+        echo cat "${KUBEADM_FLAGS_ENV}"
+        cat "${KUBEADM_FLAGS_ENV}"
         echo "================ Configure kubelet ========================="
         echo "cp ${KUBEADM_FLAGS_ENV} ${KUBEADM_FLAGS_ENV}.bak"
         echo "cat <<EOF > ${KUBEADM_FLAGS_ENV}"
-        echo "${NEW_FLAGE}"
+        echo "${NEW_FLAGS}"
         echo "EOF"
         echo "systemctl daemon-reload"
         echo "systemctl restart kubelet"
@@ -164,7 +165,7 @@ function configure_kubelet() {
 
     cp "${KUBEADM_FLAGS_ENV}" "${KUBEADM_FLAGS_ENV}.bak"
     cat <<EOF >${KUBEADM_FLAGS_ENV}
-${NEW_FLAGE}
+${NEW_FLAGS}
 EOF
     systemctl daemon-reload
     systemctl restart kubelet
