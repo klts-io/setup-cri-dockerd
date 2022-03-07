@@ -21,18 +21,33 @@ set -o pipefail
 KUBEADM_FLAGS_ENV="/var/lib/kubelet/kubeadm-flags.env"
 SERVICE_PATH="/etc/systemd/system/cri-docker.service"
 
-if [[ ! -f "${KUBEADM_FLAGS_ENV}.bak" ]] ; then
+if [[ ! -f "${KUBEADM_FLAGS_ENV}.bak" ]]; then
     echo "Backing up ${KUBEADM_FLAGS_ENV} is not found"
-    echo 1    
+    echo 1
 fi
 
-cp "${KUBEADM_FLAGS_ENV}.bak" "${KUBEADM_FLAGS_ENV}"
+if [[ ! -f "${SERVICE_PATH}" ]]; then
+    echo "Service ${SERVICE_PATH} is not found"
+    echo 1
+fi
 
-systemctl daemon-reload
-systemctl restart kubelet
+function back_configure_kubelet() {
+    echo "Restoring ${KUBEADM_FLAGS_ENV}"
+    cp "${KUBEADM_FLAGS_ENV}.bak" "${KUBEADM_FLAGS_ENV}"
+    systemctl daemon-reload
+    systemctl restart kubelet
+}
 
-systemctl disable cri-docker.service
-systemctl stop cri-docker.service
+function uninstall_cri_dockerd() {
+    echo "Uninstalling cri-dockerd"
+    systemctl disable cri-docker.service
+    systemctl stop cri-docker.service
+    rm -f "${SERVICE_PATH}"
+}
 
-rm -f "${SERVICE_PATH}"
+function main() {
+    back_configure_kubelet
+    uninstall_cri_dockerd
+}
 
+main

@@ -19,9 +19,9 @@ set -o nounset
 set -o pipefail
 
 ARCH=$(arch)
-if [[ "${ARCH}" =~ "x86_64" ]];then
+if [[ "${ARCH}" =~ "x86_64" ]]; then
     ARCH="amd64"
-elif [[ "${ARCH}" =~ "aarch64" ]];then
+elif [[ "${ARCH}" =~ "aarch64" ]]; then
     ARCH="arm64"
 else
     echo "${ARCH} is not supported"
@@ -29,6 +29,7 @@ else
 fi
 
 VERSION=${VERSION:-v0.2.0}
+FORCE=${FORCE:-n}
 
 BIN_URL="https://github.com/Mirantis/cri-dockerd/releases/download/${VERSION}/cri-dockerd-${VERSION}-linux-${ARCH}.tar.gz"
 CRI_SOCK="unix:///var/run/cri-dockerd.sock"
@@ -40,33 +41,41 @@ TAR_NAME="cri-dockerd.tar.gz"
 TAR_PATH="${TMPDIR:-/tmp/}/install-cri-dockerd"
 BIN_NAME="cri-dockerd"
 BIN_PATH="/usr/local/bin"
-
-
 OLD_FLAGS=$(cat "${KUBEADM_FLAGS_ENV}")
-if [[ "${OLD_FLAGS}" =~ "--container-runtime=remote" ]] ; then
-    echo cat "${KUBEADM_FLAGS_ENV}"
-    cat "${KUBEADM_FLAGS_ENV}"
-    echo "The container runtime is already set to remote"
-    exit 1
-fi
 
-if [[ ! -s "${BIN_PATH}/${BIN_NAME}" ]]; then
-    echo "Installing binary of cri-dockerd"
-    if [[ ! -s "${TAR_PATH}/${TAR_NAME}" ]]; then
-        mkdir -p "${TAR_PATH}" && wget -O "${TAR_PATH}/${TAR_NAME}" "${BIN_URL}"
+function check_container_runtime_of_kubelet() {
+    if [[ "${OLD_FLAGS}" =~ "--container-runtime=remote" ]]; then
+        echo cat "${KUBEADM_FLAGS_ENV}"
+        cat "${KUBEADM_FLAGS_ENV}"
+        echo "The container runtime is already set to remote"
+        echo "Please check the container runtime of kubelet"
+        exit 1
     fi
-    tar -xzvf "${TAR_PATH}/${TAR_NAME}" -C "${BIN_PATH}" "${BIN_NAME}" && chmod +x "${BIN_PATH}/${BIN_NAME}"
-else
-    echo "Binary of cri-dockerd already installed"
-fi
+}
 
-echo "${BIN_PATH}/${BIN_NAME}" --version
-"${BIN_PATH}/${BIN_NAME}" --version
+function install_cri_dockerd() {
+    if [[ ! -s "${BIN_PATH}/${BIN_NAME}" ]]; then
+        echo "Installing cri-dockerd"
+        if [[ ! -s "${TAR_PATH}/${TAR_NAME}" ]]; then
+            echo "Downloading binary of cri-dockerd"
+            mkdir -p "${TAR_PATH}" && wget -O "${TAR_PATH}/${TAR_NAME}" "${BIN_URL}"
+        fi
+        tar -xzvf "${TAR_PATH}/${TAR_NAME}" -C "${BIN_PATH}" "${BIN_NAME}" && chmod +x "${BIN_PATH}/${BIN_NAME}"
+        echo "Binary of cri-dockerd is installed"
+    else
+        echo "Binary of cri-dockerd already installed"
+    fi
 
+    echo "${BIN_PATH}/${BIN_NAME}" --version
+    "${BIN_PATH}/${BIN_NAME}" --version || {
+        echo "Failed to install cri-dockerd"
+        exit 1
+    }
+}
 
-source "${KUBEADM_FLAGS_ENV}"
-
-cat <<EOF > "${SERVICE_PATH}"
+function start_cri_dockerd() {
+    source "${KUBEADM_FLAGS_ENV}"
+    cat <<EOF >"${SERVICE_PATH}"
 [Unit]
 Description=CRI Interface for Docker Application Container Engine
 Documentation=https://docs.mirantis.com
@@ -97,40 +106,73 @@ KillMode=process
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable "${SERVICE_NAME}"
-systemctl restart "${SERVICE_NAME}"
-systemctl status --no-pager "${SERVICE_NAME}"
+    systemctl daemon-reload
+    systemctl enable "${SERVICE_NAME}"
+    systemctl restart "${SERVICE_NAME}"
+    systemctl status --no-pager "${SERVICE_NAME}" || {
+        echo "Failed to start cri-dockerd"
+        exit 1
+    }
 
-echo crictl --runtime-endpoint "${CRI_SOCK}" ps
-crictl --runtime-endpoint "${CRI_SOCK}" ps
+    echo "crictl --runtime-endpoint "${CRI_SOCK}" ps"
+    crictl --runtime-endpoint "${CRI_SOCK}" ps
+}
 
-echo "cri-dockerd started"
+function configure_kubelet() {
+    NEW_FLAGE=$(echo "${OLD_FLAGS%\"*} --container-runtime=remote --container-runtime-endpoint=${CRI_SOCK}\"")
 
-NEW_FLAGE=$(echo "${OLD_FLAGS%\"*} --container-runtime=remote --container-runtime-endpoint=${CRI_SOCK}\"")
-diff "${KUBEADM_FLAGS_ENV}" <(echo "${NEW_FLAGE}" ) || :
-
-echo "Next will configure Kubelet:"
-echo "cat <<EOF > ${KUBEADM_FLAGS_ENV}"
-echo "${NEW_FLAGE}"
-echo "EOF"
-echo "systemctl daemon-reload"
-echo "systemctl restart kubelet"
-
-read -r -p "Are you sure? [y/n] " response
-case "$response" in
-    [yY][eE][sS]|[yY]) 
-         
+    case "${FORCE}" in
+    [yY][eE][sS] | [yY])
+        : # Skip
         ;;
     *)
-        exit 0
-        ;;
-esac
 
-cp "${KUBEADM_FLAGS_ENV}" "${KUBEADM_FLAGS_ENV}.bak"
-cat <<EOF > ${KUBEADM_FLAGS_ENV}
+        echo "============= Diff kubeadm-flags.env with new =============="
+        diff "${KUBEADM_FLAGS_ENV}" <(echo "${NEW_FLAGE}") || :
+        echo "================ Configure kubelet ========================="
+        echo "cp ${KUBEADM_FLAGS_ENV} ${KUBEADM_FLAGS_ENV}.bak"
+        echo "cat <<EOF > ${KUBEADM_FLAGS_ENV}"
+        echo "${NEW_FLAGE}"
+        echo "EOF"
+        echo "systemctl daemon-reload"
+        echo "systemctl restart kubelet"
+        echo "============================================================"
+        echo "Please double check the configuration of kubelet"
+        echo "Next will execute the that command"
+        echo "If you don't need this prompt process, please run:"
+        echo "    FORCE=y $0"
+        echo "============================================================"
+
+        read -r -p "Are you sure? [y/n] " response
+        case "$response" in
+        [yY][eE][sS] | [yY])
+            : # Skip
+            ;;
+        *)
+            echo "You no enter 'y', so abort install now"
+            echo "but the cri-dockerd is installed and running"
+            echo "if need is uninstall the cri-dockerd please run:"
+            echo "   systemctl stop cri-docker.service"
+            echo "   systemctl disable cri-docker.service"
+            exit 1
+            ;;
+        esac
+        ;;
+    esac
+
+    cp "${KUBEADM_FLAGS_ENV}" "${KUBEADM_FLAGS_ENV}.bak"
+    cat <<EOF >${KUBEADM_FLAGS_ENV}
 ${NEW_FLAGE}
 EOF
-systemctl daemon-reload
-systemctl restart kubelet
+    systemctl daemon-reload
+    systemctl restart kubelet
+}
 
+function main() {
+    check_container_runtime_of_kubelet
+    install_cri_dockerd
+    start_cri_dockerd
+    configure_kubelet
+}
+
+main
