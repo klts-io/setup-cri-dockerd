@@ -2,7 +2,7 @@
 
 这个项目是 [cri-dockerd](https://github.com/Mirantis/cri-dockerd) 的安装卸载脚本
 
-可以非常方便的从 Docker shim 切换到 CRI Docker 和回退, Pod 不会重启
+可以非常方便的从 Docker shim 切换到 CRI Dockerd 和回退, Pod 不会重启
 
 - [English](https://github.com/klts-io/setup-cri-dockerd/blob/main/README.md)
 - [简体中文](https://github.com/klts-io/setup-cri-dockerd/blob/main/README_cn.md)

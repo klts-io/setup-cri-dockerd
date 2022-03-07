@@ -2,7 +2,7 @@
 
 The project is install/uninstall script of [cri-dockerd](https://github.com/Mirantis/cri-dockerd)
 
-It is very easy to switch from Docker Shim to CRI Docker and back, Pod does not restart
+It is very easy to switch from Docker Shim to CRI Dockerd and back, Pod does not restart
 
 - [English](https://github.com/klts-io/setup-cri-dockerd/blob/main/README.md)
 - [简体中文](https://github.com/klts-io/setup-cri-dockerd/blob/main/README_cn.md)
