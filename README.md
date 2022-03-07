@@ -13,7 +13,7 @@ Kubernetes installed using Kubeadm
 
 The related parameters are set in `/var/lib/kubelet/kubeadm-flags.env` as follows  (`--network-plugin`, `--pod-infra-container-image`)
 
-## Switch from Docker Shim to CRI Docker 
+## Switch from Docker Shim to CRI Dockerd
 ``` bash
 wget -O install.sh https://raw.githubusercontent.com/klts-io/setup-cri-dockerd/main/install.sh
 chmod +x ./install.sh && ./install.sh

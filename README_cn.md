@@ -13,7 +13,7 @@
 
 相关参数都在 `/var/lib/kubelet/kubeadm-flags.env` 配置 如 (`--network-plugin`, `--pod-infra-container-image`)
 
-## 从 Docker Shim 切换到 CRI Docker
+## 从 Docker Shim 切换到 CRI Dockerd
 ``` bash
 wget -O install.sh https://raw.githubusercontent.com/klts-io/setup-cri-dockerd/main/install.sh
 chmod +x ./install.sh && ./install.sh
