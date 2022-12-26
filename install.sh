@@ -18,20 +18,56 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-ARCH=$(arch)
-if [[ "${ARCH}" =~ "x86_64" ]]; then
-    ARCH="amd64"
-elif [[ "${ARCH}" =~ "aarch64" ]]; then
-    ARCH="arm64"
-else
-    echo "${ARCH} is not supported"
-    exit 1
-fi
+function goarch() {
+    local arch
+    arch="$(uname -m)"
+
+    case "${arch}" in
+    x86_64 | amd64 | x64)
+        echo "amd64"
+        ;;
+    armv8* | aarch64* | arm64)
+        echo "arm64"
+        ;;
+    *)
+        echo "${arch}"
+        ;;
+    esac
+}
+
+function usage() {
+    echo "Usage: install.sh [options]"
+    echo "Options:"
+    echo "  --force: force install"
+    echo "  --help: print this help"
+}
+
+function args() {
+    local help=0
+
+    while [[ $# -gt 0 ]]; do
+        case "${1}" in
+        --force)
+            FORCE=Y
+            ;;
+        --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: ${1}"
+            usage
+            exit 1
+            ;;
+        esac
+        shift
+    done
+}
 
 VERSION=${VERSION:-v0.2.0}
 FORCE=${FORCE:-n}
 
-BIN_URL="https://github.com/Mirantis/cri-dockerd/releases/download/${VERSION}/cri-dockerd-${VERSION}-linux-${ARCH}.tar.gz"
+BIN_URL="https://github.com/Mirantis/cri-dockerd/releases/download/${VERSION}/cri-dockerd-${VERSION}-linux-$(goarch).tar.gz"
 CRI_SOCK="unix:///var/run/cri-dockerd.sock"
 KUBEADM_FLAGS_ENV="/var/lib/kubelet/kubeadm-flags.env"
 
@@ -53,12 +89,25 @@ function check_container_runtime_of_kubelet() {
     fi
 }
 
+function download() {
+    local url=$1
+    local output=$2
+    echo "Downloading ${url} to ${output}"
+    if command -v wget >/dev/null; then
+        wget -O "${output}" "${url}"
+    elif command -v curl >/dev/null; then
+        curl -L -o "${output}" "${url}"
+    else
+        echo "Neither wget nor curl is installed"
+        exit 1
+    fi
+}
+
 function install_cri_dockerd() {
-    if [[ ! -s "${BIN_PATH}/${BIN_NAME}" ]]; then
+    if [[ ! -x "${BIN_PATH}/${BIN_NAME}" ]]; then
         echo "Installing cri-dockerd"
         if [[ ! -s "${TAR_PATH}/${TAR_NAME}" ]]; then
-            echo "Downloading binary of cri-dockerd"
-            mkdir -p "${TAR_PATH}" && wget -O "${TAR_PATH}/${TAR_NAME}" "${BIN_URL}"
+            mkdir -p "${TAR_PATH}" && download "${BIN_URL}" "${TAR_PATH}/${TAR_NAME}"
         fi
         tar -xzvf "${TAR_PATH}/${TAR_NAME}" -C "${BIN_PATH}" "${BIN_NAME}" && chmod +x "${BIN_PATH}/${BIN_NAME}"
         echo "Binary of cri-dockerd is installed"
@@ -73,6 +122,60 @@ function install_cri_dockerd() {
     }
 }
 
+function filter_kubelet_args() {
+    local arg
+    local out=()
+    while [[ $# -gt 0 ]]; do
+        arg="$1"
+        case "${arg}" in
+        --cni-bin-dir | --cni-bin-dir=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--cni-bin-dir=${arg#*=}") || { out+=("--cni-bin-dir=${2}") && shift; }
+            shift
+            ;;
+        --cni-cache-dir | --cni-cache-dir=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--cni-cache-dir=${arg#*=}") || { out+=("--cni-cache-dir=${2}") && shift; }
+            shift
+            ;;
+        --cni-conf-dir | --cni-conf-dir=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--cni-conf-dir=${arg#*=}") || { out+=("--cni-conf-dir=${2}") && shift; }
+            shift
+            ;;
+        --image-pull-progress-deadline | --image-pull-progress-deadline=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--image-pull-progress-deadline=${arg#*=}") || { out+=("--image-pull-progress-deadline=${2}") && shift; }
+            shift
+            ;;
+        --log-level | --log-level=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--log-level=${arg#*=}") || { out+=("--log-level=${2}") && shift; }
+            shift
+            ;;
+        --network-plugin | --network-plugin=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--network-plugin=${arg#*=}") || { out+=("--network-plugin=${2}") && shift; }
+            shift
+            ;;
+        --network-plugin-mtu | --network-plugin-mtu=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--network-plugin-mtu=${arg#*=}") || { out+=("--network-plugin-mtu=${2}") && shift; }
+            shift
+            ;;
+        --pod-cidr | --pod-cidr=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--pod-cidr=${arg#*=}") || { out+=("--pod-cidr=${2}") && shift; }
+            shift
+            ;;
+        --pod-infra-container-image | --pod-infra-container-image=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--pod-infra-container-image=${arg#*=}") || { out+=("--pod-infra-container-image=${2}") && shift; }
+            shift
+            ;;
+        --runtime-cgroups | --runtime-cgroups=*)
+            [[ "${arg#*=}" != "${arg}" ]] && out+=("--runtime-cgroups=${arg#*=}") || { out+=("--runtime-cgroups=${2}") && shift; }
+            shift
+            ;;
+        *)
+            shift
+            ;;
+        esac
+    done
+    echo "${out[@]}"
+}
+
 function start_cri_dockerd() {
     source "${KUBEADM_FLAGS_ENV}"
     cat <<EOF >"${SERVICE_PATH}"
@@ -84,7 +187,7 @@ Wants=network-online.target
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/cri-dockerd --cri-dockerd-root-directory=/var/lib/dockershim --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --container-runtime-endpoint ${CRI_SOCK} ${KUBELET_KUBEADM_ARGS}
+ExecStart=/usr/local/bin/cri-dockerd --cri-dockerd-root-directory=/var/lib/dockershim --cni-conf-dir=/etc/cni/net.d --cni-bin-dir=/opt/cni/bin --container-runtime-endpoint=${CRI_SOCK} $(filter_kubelet_args ${KUBELET_KUBEADM_ARGS})
 ExecReload=/bin/kill -s HUP \$MAINPID
 TimeoutSec=0
 RestartSec=2
@@ -107,8 +210,7 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    systemctl enable "${SERVICE_NAME}"
-    systemctl restart "${SERVICE_NAME}"
+    systemctl enable "${SERVICE_NAME}" --now
     systemctl status --no-pager "${SERVICE_NAME}" || {
         echo "Failed to start cri-dockerd"
         exit 1
@@ -141,7 +243,7 @@ function configure_kubelet() {
         echo "Please double check the configuration of kubelet"
         echo "Next will execute the that command"
         echo "If you don't need this prompt process, please run:"
-        echo "    FORCE=y $0"
+        echo "    $0 --force"
         echo "============================================================"
 
         read -r -p "Are you sure? [y/n] " response
@@ -172,10 +274,11 @@ EOF
 }
 
 function main() {
+    args "$@"
     check_container_runtime_of_kubelet
     install_cri_dockerd
     start_cri_dockerd
     configure_kubelet
 }
 
-main
+main "$@"
