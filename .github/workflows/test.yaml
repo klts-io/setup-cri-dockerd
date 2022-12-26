@@ -1,0 +1,57 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  test:
+    # https://docs.github.com/en/actions/using-jobs/using-concurrency
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}-${{ matrix.kube-version }}
+      cancel-in-progress: true
+
+    # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
+    strategy:
+      fail-fast: false
+      matrix:
+        kube-release:
+          - 1.23
+
+    continue-on-error: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up minikube
+        uses: sagikazarmark/setup-minikube-action@v0
+
+      - name: Launch minikube cluster
+        run: minikube start --kubernetes-version=v1.23.15
+
+      - name: Get pods
+        run: |
+          minikube kubectl -- get pods -o wide --all-namespaces
+      
+      - name: Get nodes
+        run: |
+          minikube kubectl -- get nodes -o wide
+
+      - name: Install cri-dockerd
+        run: |
+          minikube cp install.sh /home/docker/install.sh
+          minikube ssh -- sudo bash /home/docker/install.sh --force
+
+      - name: Get pods
+        run: |
+          kubectl get pods -o wide --all-namespaces
+      
+      - name: Get nodes
+        run: |
+          kubectl get nodes -o wide
