@@ -41,10 +41,10 @@ TAR_NAME="cri-dockerd.tar.gz"
 TAR_PATH="${TMPDIR:-/tmp/}/install-cri-dockerd"
 BIN_NAME="cri-dockerd"
 BIN_PATH="/usr/local/bin"
-OLD_FLAGS=$(cat "${KUBEADM_FLAGS_ENV}")
 
 function check_container_runtime_of_kubelet() {
     if [[ -f "${KUBEADM_FLAGS_ENV}" ]]; then
+        OLD_FLAGS=$(cat "${KUBEADM_FLAGS_ENV}")
         if [[ "${OLD_FLAGS}" =~ "--container-runtime=remote" ]]; then
             echo cat "${KUBEADM_FLAGS_ENV}"
             cat "${KUBEADM_FLAGS_ENV}"
