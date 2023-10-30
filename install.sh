@@ -44,12 +44,14 @@ BIN_PATH="/usr/local/bin"
 OLD_FLAGS=$(cat "${KUBEADM_FLAGS_ENV}")
 
 function check_container_runtime_of_kubelet() {
-    if [[ "${OLD_FLAGS}" =~ "--container-runtime=remote" ]]; then
-        echo cat "${KUBEADM_FLAGS_ENV}"
-        cat "${KUBEADM_FLAGS_ENV}"
-        echo "The container runtime is already set to remote"
-        echo "Please check the container runtime of kubelet"
-        exit 1
+    if [[ -f "${KUBEADM_FLAGS_ENV}" ]]; then
+        if [[ "${OLD_FLAGS}" =~ "--container-runtime=remote" ]]; then
+            echo cat "${KUBEADM_FLAGS_ENV}"
+            cat "${KUBEADM_FLAGS_ENV}"
+            echo "The container runtime is already set to remote"
+            echo "Please check the container runtime of kubelet"
+            exit 1
+        fi
     fi
 }
 
