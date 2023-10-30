@@ -83,7 +83,7 @@ function start_cri_dockerd() {
         source "${KUBEADM_FLAGS_ENV}"
     fi
 
-    cat <<EOF >"${SERVICE_PATH}"
+    sudo cat <<EOF >"${SERVICE_PATH}"
 [Unit]
 Description=CRI Interface for Docker Application Container Engine
 Documentation=https://docs.mirantis.com
