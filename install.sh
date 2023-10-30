@@ -62,7 +62,7 @@ function install_cri_dockerd() {
             echo "Downloading binary of cri-dockerd"
             mkdir -p "${TAR_PATH}" && wget -O "${TAR_PATH}/${TAR_NAME}" "${BIN_URL}"
         fi
-        tar -xzvf "${TAR_PATH}/${TAR_NAME}" -C "${BIN_PATH}" "${BIN_NAME}" && chmod +x "${BIN_PATH}/${BIN_NAME}"
+        sudo tar -xzvf "${TAR_PATH}/${TAR_NAME}" -C "${BIN_PATH}" "${BIN_NAME}" && sudo chmod +x "${BIN_PATH}/${BIN_NAME}"
         echo "Binary of cri-dockerd is installed"
     else
         echo "Binary of cri-dockerd already installed"
@@ -136,8 +136,8 @@ function configure_kubelet() {
         echo "cat <<EOF > ${KUBEADM_FLAGS_ENV}"
         echo "${NEW_FLAGS}"
         echo "EOF"
-        echo "systemctl daemon-reload"
-        echo "systemctl restart kubelet"
+        echo "sudo systemctl daemon-reload"
+        echo "sudo systemctl restart kubelet"
         echo "============================================================"
         echo "Please double check the configuration of kubelet"
         echo "Next will execute the that command"
@@ -154,10 +154,10 @@ function configure_kubelet() {
             echo "You no enter 'y', so abort install now"
             echo "but the cri-dockerd is installed and running"
             echo "if need is uninstall the cri-dockerd please run:"
-            echo "   systemctl stop ${SERVICE_NAME}"
-            echo "   systemctl disable ${SERVICE_NAME}"
-            echo "   rm ${SERVICE_PATH}"
-            echo "   rm ${BIN_PATH}/${BIN_NAME}"
+            echo "   sudo systemctl stop ${SERVICE_NAME}"
+            echo "   sudo systemctl disable ${SERVICE_NAME}"
+            echo "   sudo rm ${SERVICE_PATH}"
+            echo "   sudo rm ${BIN_PATH}/${BIN_NAME}"
             exit 1
             ;;
         esac
@@ -168,8 +168,8 @@ function configure_kubelet() {
     cat <<EOF >${KUBEADM_FLAGS_ENV}
 ${NEW_FLAGS}
 EOF
-    systemctl daemon-reload
-    systemctl restart kubelet
+    sudo systemctl daemon-reload
+    sudo systemctl restart kubelet
 }
 
 function main() {
