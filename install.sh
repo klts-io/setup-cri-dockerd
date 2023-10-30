@@ -34,7 +34,7 @@ FORCE=${FORCE:-n}
 BIN_URL="https://github.com/Mirantis/cri-dockerd/releases/download/${VERSION}/cri-dockerd-${VERSION}-linux-${ARCH}.tar.gz"
 CRI_SOCK="unix:///var/run/cri-dockerd.sock"
 KUBEADM_FLAGS_ENV="/var/lib/kubelet/kubeadm-flags.env"
-if [[ ! "${KUBELET_KUBEADM_ARGS}"="" ]]; then
+if [[ ! -v KUBELET_KUBEADM_ARGS ]]; then
     KUBELET_KUBEADM_ARGS=""
 fi
 
