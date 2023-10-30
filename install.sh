@@ -76,7 +76,10 @@ function install_cri_dockerd() {
 }
 
 function start_cri_dockerd() {
-    source "${KUBEADM_FLAGS_ENV}"
+    if [[ -f "${KUBEADM_FLAGS_ENV}" ]]; then
+        source "${KUBEADM_FLAGS_ENV}"
+    fi
+
     cat <<EOF >"${SERVICE_PATH}"
 [Unit]
 Description=CRI Interface for Docker Application Container Engine
